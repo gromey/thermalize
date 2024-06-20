@@ -44,6 +44,9 @@ type Cmd interface {
 	//	b = 2, right justification enabled.
 	Align(b byte)
 
+	// UpsideDown selects upside-down print mode on/off.
+	UpsideDown(b bool)
+
 	// TabPositions sets horizontal tab position.
 	// Default 8, 16, 24, 32, 40, ..., 232, 240, 248
 	TabPositions(bs ...byte)
@@ -60,6 +63,9 @@ type Cmd interface {
 
 	// Bold selects emphasized printing.
 	Bold(b bool)
+
+	// ClockwiseRotation turns 90' clockwise rotation mode on/off.
+	ClockwiseRotation(b bool)
 
 	// Underling selects/cancels underling mode.
 	//
@@ -142,4 +148,7 @@ type Cmd interface {
 
 	// OpenCashDrawer generates pulse to open a cache drawer.
 	OpenCashDrawer(m byte, t1 byte, t2 byte)
+
+	// Print performs final preparation of the document before printing.
+	Print()
 }

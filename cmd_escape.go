@@ -48,6 +48,14 @@ func (c *escape) Align(b byte) {
 	c.Write(ESC, 'a', b)
 }
 
+func (c *escape) UpsideDown(b bool) {
+	if b {
+		c.Write(ESC, '{', 1)
+		return
+	}
+	c.Write(ESC, '{', 0)
+}
+
 // TabPositions maximum of 32 horizontal tabs can be set.
 func (c *escape) TabPositions(bs ...byte) {
 	l := len(bs)
@@ -101,6 +109,14 @@ func (c *escape) Bold(b bool) {
 		return
 	}
 	c.Write(ESC, 'E', 0)
+}
+
+func (c *escape) ClockwiseRotation(b bool) {
+	if b {
+		c.Write(ESC, 'V', 1)
+		return
+	}
+	c.Write(ESC, 'V', 0)
 }
 
 func (c *escape) Underling(b byte) {
