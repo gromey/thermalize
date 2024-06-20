@@ -49,6 +49,7 @@ func main() {
 	p.Text("Hello world!", nil)
 	p.LineFeed()
 	p.FullCut()
+	p.Print()
 
 	defer w.Reset()
 
@@ -99,6 +100,7 @@ func main() {
 	p.Text("Hello world!", nil)
 	p.LineFeed()
 	p.FullCut()
+	p.Print()
 
 	if err = w.Flush(); err != nil {
 		panic(err)
@@ -143,6 +145,7 @@ func main() {
 	p.Image(thermalize.Logo(), false)
 	p.LineFeed()
 	p.FullCut()
+	p.Print()
 
 	if err = w.Flush(); err != nil {
 		panic(err)

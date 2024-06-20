@@ -23,27 +23,6 @@ func Gray(c color.Color, invert bool) bool {
 	return color.GrayModel.Convert(c).(color.Gray).Y < GrayLevel
 }
 
-func ImageToBit(img image.Image, invert bool) (int, []byte) {
-	sz := img.Bounds().Size()
-
-	width := sz.X / 8
-	if sz.X%8 != 0 {
-		width += 1
-	}
-
-	data := make([]byte, width*sz.Y)
-
-	for y := 0; y < sz.Y; y++ {
-		for x := 0; x < sz.X; x++ {
-			if Gray(img.At(x, y), invert) {
-				data[y*width+x/8] |= 0x80 >> uint(x%8)
-			}
-		}
-	}
-
-	return width, data
-}
-
 func ImageToBin(img image.Image, invert bool) (int, []byte) {
 	sz := img.Bounds().Size()
 
@@ -61,6 +40,43 @@ func ImageToBin(img image.Image, invert bool) (int, []byte) {
 		for x := 0; x < sz.X; x++ {
 			if Gray(img.At(x, y), invert) {
 				data[n+x*3] |= 0x80 >> uint(y%8)
+			}
+		}
+	}
+
+	return sz.X, data
+}
+
+func ImageToBit(img image.Image, invert bool) (int, []byte) {
+	sz := img.Bounds().Size()
+
+	w := sz.X / 8
+	if sz.X%8 != 0 {
+		w += 1
+	}
+
+	data := make([]byte, w*sz.Y)
+
+	for y := 0; y < sz.Y; y++ {
+		for x := 0; x < sz.X; x++ {
+			if Gray(img.At(x, y), invert) {
+				data[y*w+x/8] |= 0x80 >> uint(x%8)
+			}
+		}
+	}
+
+	return w, data
+}
+
+func ImageToBytes(img image.Image, invert bool) (int, []byte) {
+	sz := img.Bounds().Size()
+
+	data := make([]byte, sz.X*sz.Y)
+
+	for y := 0; y < sz.Y; y++ {
+		for x := 0; x < sz.X; x++ {
+			if !Gray(img.At(x, y), invert) {
+				data[y*sz.X+x] = 255
 			}
 		}
 	}

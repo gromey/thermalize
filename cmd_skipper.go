@@ -52,6 +52,8 @@ func (c *skipper) AbsolutePosition(int) {}
 
 func (c *skipper) Align(byte) {}
 
+func (c *skipper) UpsideDown(bool) {}
+
 func (c *skipper) TabPositions(...byte) {}
 
 func (c *skipper) Tab() {}
@@ -61,6 +63,8 @@ func (c *skipper) CodePage(byte) {}
 func (c *skipper) CharSize(byte, byte) {}
 
 func (c *skipper) Bold(bool) {}
+
+func (c *skipper) ClockwiseRotation(bool) {}
 
 func (c *skipper) Underling(byte) {}
 
@@ -91,3 +95,5 @@ func (c *skipper) Cut(byte, byte) {}
 func (c *skipper) FullCut() {}
 
 func (c *skipper) OpenCashDrawer(byte, byte, byte) {}
+
+func (c *skipper) Print() {}
