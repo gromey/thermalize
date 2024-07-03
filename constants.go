@@ -1,5 +1,13 @@
 package thermalize
 
+type ImageFuncVersion byte
+
+const (
+	ImageFuncV0 ImageFuncVersion = iota
+	ImageFuncV1
+	ImageFuncV2
+)
+
 const (
 	NUL byte = iota // NUL - Null.
 	SOH             // SOH - Start of heading.

@@ -6,14 +6,19 @@ import (
 )
 
 // NewEscape returns the most popular set of printer commands.
-// If the obsolete is true, the obsolete print image command will be used.
-func NewEscape(cpl, ppl int, w io.Writer, obsolete bool) Cmd {
-	return &escape{Cmd: NewSkipper(cpl, ppl, w), obsolete: obsolete}
+// ImageFuncVersion tells which command to use to print an image.
+//
+// The set of Escape commands supports the following versions:
+//   - ImageFuncV0 [GS v ...] the obsolete print image command;
+//   - ImageFuncV1 [GS 8 L ... GS ( L]
+//   - ImageFuncV2 [ESC * ! ... ESC J]
+func NewEscape(cpl, ppl int, w io.Writer, v ImageFuncVersion) Cmd {
+	return &escape{Cmd: NewSkipper(cpl, ppl, w), version: v}
 }
 
 type escape struct {
 	Cmd
-	obsolete bool
+	version ImageFuncVersion
 }
 
 func (c *escape) Init() {
@@ -21,31 +26,25 @@ func (c *escape) Init() {
 }
 
 func (c *escape) LeftMargin(n int) {
-	if n > c.PPL() {
-		return
+	if n < c.PPL() {
+		c.Write(GS, 'L', byte(n), byte(n>>8))
 	}
-	c.Write(GS, 'L', byte(n), byte(n>>8))
 }
 
 func (c *escape) WidthArea(n int) {
-	if n > c.PPL() {
-		return
+	if n < c.PPL() {
+		c.Write(GS, 'W', byte(n), byte(n>>8))
 	}
-	c.Write(GS, 'W', byte(n), byte(n>>8))
 }
 
 func (c *escape) AbsolutePosition(n int) {
-	if n > c.PPL() {
-		return
+	if n < c.PPL() {
+		c.Write(ESC, '$', byte(n), byte(n>>8))
 	}
-	c.Write(ESC, '$', byte(n), byte(n>>8))
 }
 
 func (c *escape) Align(b byte) {
-	if b > 2 {
-		b = 2
-	}
-	c.Write(ESC, 'a', b)
+	c.Write(ESC, 'a', minByte(b, 2))
 }
 
 func (c *escape) UpsideDown(b bool) {
@@ -94,13 +93,7 @@ func (c *escape) CodePage(b byte) {
 //	w: character width (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 4 - x5, 5 - x6, 6 - x7, 7 - x8)
 //	h: character height (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 4 - x5, 5 - x6, 6 - x7, 7 - x8)
 func (c *escape) CharSize(w, h byte) {
-	if w > 7 {
-		w = 7
-	}
-	if h > 7 {
-		h = 7
-	}
-	c.Write(GS, '!', w<<4+h)
+	c.Write(GS, '!', minByte(w, 7)<<4+minByte(h, 7))
 }
 
 func (c *escape) Bold(b bool) {
@@ -120,43 +113,27 @@ func (c *escape) ClockwiseRotation(b bool) {
 }
 
 func (c *escape) Underling(b byte) {
-	if b > 2 {
-		b = 2
-	}
-	c.Write(ESC, '-', b)
+	c.Write(ESC, '-', minByte(b, 2))
 }
 
 // BarcodeWidth
 //
 //	1 <= b <= 6.
 func (c *escape) BarcodeWidth(b byte) {
-	if b == 0 {
-		b = 1
-	} else if b > 6 {
-		b = 6
-	}
-	c.Write(GS, 'w', b)
+	b = maxByte(b, 1)
+	c.Write(GS, 'w', minByte(b, 6))
 }
 
 func (c *escape) BarcodeHeight(b byte) {
-	if b == 0 {
-		b = 1
-	}
-	c.Write(GS, 'h', b)
+	c.Write(GS, 'h', maxByte(b, 1))
 }
 
 func (c *escape) HRIFont(b byte) {
-	if b > 1 {
-		b = 1
-	}
-	c.Write(GS, 'f', b)
+	c.Write(GS, 'f', minByte(b, 1))
 }
 
 func (c *escape) HRIPosition(b byte) {
-	if b > 3 {
-		b = 3
-	}
-	c.Write(GS, 'H', b)
+	c.Write(GS, 'H', minByte(b, 3))
 }
 
 func (c *escape) Barcode(m byte, s string) {
@@ -173,12 +150,8 @@ func (c *escape) Barcode(m byte, s string) {
 //
 //	1 <= b <= 16.
 func (c *escape) QRCodeSize(b byte) {
-	if b < 1 {
-		b = 1
-	} else if b > 16 {
-		b = 16
-	}
-	c.Write(GS, '(', 'k', 3, 0, 49, 67, b)
+	b = maxByte(b, 1)
+	c.Write(GS, '(', 'k', 3, 0, 49, 67, minByte(b, 16))
 }
 
 // QRCodeCorrectionLevel (cn = 49, fn = 69).
@@ -205,6 +178,20 @@ func (c *escape) QRCode(s string) {
 }
 
 func (c *escape) Image(img image.Image, invert bool) {
+	switch c.version {
+	case ImageFuncV1:
+		c.imageV1(img, invert)
+	case ImageFuncV2:
+		c.imageV2(img, invert)
+	//case 3:
+	//	c.imageV3(img, invert)
+	default:
+		c.imageV0(img, invert)
+	}
+}
+
+// Obsolete command to print an image
+func (c *escape) imageV0(img image.Image, invert bool) {
 	w, bs := ImageToBit(img, invert)
 
 	l := len(bs)
@@ -212,22 +199,20 @@ func (c *escape) Image(img image.Image, invert bool) {
 		return
 	}
 
-	if c.obsolete {
-		c.imageObsolete(w, l, bs)
-		return
-	}
-
-	c.image(w, l, bs)
-}
-
-func (c *escape) imageObsolete(w, l int, bs []byte) {
 	h := l / w
 
 	c.Write(GS, 'v', 0, 0, byte(w), byte(w>>8), byte(h), byte(h>>8))
 	c.Write(bs...)
 }
 
-func (c *escape) image(w, l int, bs []byte) {
+func (c *escape) imageV1(img image.Image, invert bool) {
+	w, bs := ImageToBit(img, invert)
+
+	l := len(bs)
+	if l == 0 {
+		return
+	}
+
 	p := 10 + l
 	p1, p2, p3, p4 := byte(p), byte(p>>8), byte(p>>16), byte(p>>24)
 
@@ -247,11 +232,30 @@ func (c *escape) image(w, l int, bs []byte) {
 	c.Write(GS, '(', 'L', 2, 0, 48, 2)
 }
 
-func (c *escape) Feed(b byte) {
-	if b == 0 {
-		return
+func (c *escape) imageV2(img image.Image, invert bool) {
+	w, bs := ImageToBin(img, invert)
+
+	xl, xh := byte(w), byte(w>>8)
+
+	l := len(bs)
+	block := w * 3
+	start := 0
+
+	for end := block; start < l; end += block {
+		end = minByte(end, l)
+
+		c.Write(ESC, '*', '!', xl, xh)
+		c.Write(bs[start:end]...)
+		c.Write(ESC, 'J', 24)
+
+		start = end
 	}
-	c.Write(ESC, 'J', b)
+}
+
+func (c *escape) Feed(b byte) {
+	if b > 0 {
+		c.Write(ESC, 'J', b)
+	}
 }
 
 func (c *escape) LineFeed() {
@@ -287,14 +291,11 @@ func (c *escape) OpenCashDrawer(m byte, t1, t2 byte) {
 	case t1 > t2:
 		t1, t2 = t2, t1
 	}
-	if m > 1 {
-		m = 1
-	}
-	c.Write(ESC, 'p', m, t1, t2)
+	c.Write(ESC, 'p', minByte(m, 1), t1, t2)
 }
 
 func (c *escape) barcodeType(m byte) byte {
-	if m < 13 {
+	if m > 13 {
 		m = 4
 	}
 	return [14]byte{65, 66, 68, 67, 69, 72, 73, 70, 71, 74, 75, 76, 77, 78}[m]

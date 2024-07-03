@@ -97,3 +97,22 @@ func (c *skipper) FullCut() {}
 func (c *skipper) OpenCashDrawer(byte, byte, byte) {}
 
 func (c *skipper) Print() {}
+
+type number interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~float32 | ~float64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
+}
+
+func minByte[T number](a, b T) T {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxByte[T number](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
