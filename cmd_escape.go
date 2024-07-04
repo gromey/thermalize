@@ -5,20 +5,39 @@ import (
 	"io"
 )
 
-// NewEscape returns the most popular set of printer commands.
-// ImageFuncVersion tells which command to use to print an image.
+// NewEscape returns the most popular set of printer commands for the given configuration.
 //
-// The set of Escape commands supports the following versions:
-//   - ImageFuncV0 [GS v ...] the obsolete print image command;
-//   - ImageFuncV1 [GS 8 L ... GS ( L]
-//   - ImageFuncV2 [ESC * ! ... ESC J]
-func NewEscape(cpl, ppl int, w io.Writer, v ImageFuncVersion) Cmd {
-	return &escape{Cmd: NewSkipper(cpl, ppl, w), version: v}
+// This function creates a new escape sequence command set for printing images and text.
+// By default, the obsolete [GS v ...] print image command is used.
+//
+// Parameters:
+//   - cpl: characters per line.
+//   - ppl: pixels per line.
+//   - w: the writer to which the commands will be sent.
+//   - opts: a variadic list of options to customize the behavior of the command set.
+//
+// Options:
+// You can switch the image printing function using the WithImageFuncVersion(n) option, where:
+//   - n = 1: uses the [GS 8 L ... GS ( L] print image command.
+//   - n = 2: uses the [ESC * ! ... ESC J] print image command.
+//
+// Example Usage:
+//
+// cmd := NewEscape(48, 576, writer, WithImageFuncVersion(2))
+//
+// In this example, a new escape sequence command set is created with 48 characters per line,
+// 576 pixels per line. The image printing function is set to use the [ESC * ! ... ESC J] command sequence (version 2).
+func NewEscape(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
+	cmd := &escape{Cmd: NewSkipper(cpl, ppl, w)}
+	for _, opt := range opts {
+		opt.apply(cmd)
+	}
+	return cmd
 }
 
 type escape struct {
 	Cmd
-	version ImageFuncVersion
+	version imageFuncVersionOption
 }
 
 func (c *escape) Init() {
@@ -179,30 +198,13 @@ func (c *escape) QRCode(s string) {
 
 func (c *escape) Image(img image.Image, invert bool) {
 	switch c.version {
-	case ImageFuncV1:
+	case 1:
 		c.imageV1(img, invert)
-	case ImageFuncV2:
+	case 2:
 		c.imageV2(img, invert)
-	//case 3:
-	//	c.imageV3(img, invert)
 	default:
-		c.imageV0(img, invert)
+		c.imageObsolete(img, invert)
 	}
-}
-
-// Obsolete command to print an image
-func (c *escape) imageV0(img image.Image, invert bool) {
-	w, bs := ImageToBit(img, invert)
-
-	l := len(bs)
-	if l == 0 {
-		return
-	}
-
-	h := l / w
-
-	c.Write(GS, 'v', 0, 0, byte(w), byte(w>>8), byte(h), byte(h>>8))
-	c.Write(bs...)
 }
 
 func (c *escape) imageV1(img image.Image, invert bool) {
@@ -250,6 +252,20 @@ func (c *escape) imageV2(img image.Image, invert bool) {
 
 		start = end
 	}
+}
+
+func (c *escape) imageObsolete(img image.Image, invert bool) {
+	w, bs := ImageToBit(img, invert)
+
+	l := len(bs)
+	if l == 0 {
+		return
+	}
+
+	h := l / w
+
+	c.Write(GS, 'v', 0, 0, byte(w), byte(w>>8), byte(h), byte(h>>8))
+	c.Write(bs...)
 }
 
 func (c *escape) Feed(b byte) {
