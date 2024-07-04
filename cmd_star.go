@@ -6,7 +6,8 @@ import (
 )
 
 // NewStar returns the star set of printer commands.
-func NewStar(cpl, ppl int, w io.Writer, _ bool) Cmd {
+// ImageFuncVersion is not used.
+func NewStar(cpl, ppl int, w io.Writer, _ ImageFuncVersion) Cmd {
 	return &star{Cmd: NewSkipper(cpl, ppl, w), hriPosition: 1, barcodeWidth: 1, barcodeHeight: 100}
 }
 
@@ -20,31 +21,33 @@ func (c *star) Init() {
 }
 
 func (c *star) LeftMargin(n int) {
-	if n > c.CPL() {
-		return
+	if n < c.CPL() {
+		c.Write(ESC, 'l', byte(n))
 	}
-	c.Write(ESC, 'l', byte(n))
 }
 
 func (c *star) WidthArea(n int) {
-	if n > c.CPL() {
-		return
+	if n < c.CPL() {
+		c.Write(ESC, 'Q', byte(n))
 	}
-	c.Write(ESC, 'Q', byte(n))
 }
 
 func (c *star) AbsolutePosition(n int) {
-	if n > c.PPL() {
-		return
+	if n < c.PPL() {
+		c.Write(ESC, GS, 'A', byte(n), byte(n>>8))
 	}
-	c.Write(ESC, GS, 'A', byte(n), byte(n>>8))
 }
 
 func (c *star) Align(b byte) {
-	if b > 2 {
-		b = 2
+	c.Write(ESC, GS, 'a', minByte(b, 2))
+}
+
+func (c *star) UpsideDown(b bool) {
+	if b {
+		c.Write(SI)
+		return
 	}
-	c.Write(ESC, GS, 'a', b)
+	c.Write(DC2)
 }
 
 // TabPositions maximum of 16 horizontal tabs can be set.
@@ -85,13 +88,7 @@ func (c *star) CodePage(b byte) {
 //	h: character height (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 5 - x5, 5 - x6)
 //	w: character width (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 4 - x5, 5 - x6)
 func (c *star) CharSize(h, w byte) {
-	if h > 5 {
-		h = 5
-	}
-	if w > 5 {
-		w = 5
-	}
-	c.Write(ESC, 'i', h, w)
+	c.Write(ESC, 'i', minByte(w, 5), minByte(h, 5))
 }
 
 func (c *star) Bold(b bool) {
@@ -103,27 +100,17 @@ func (c *star) Bold(b bool) {
 }
 
 func (c *star) Underling(b byte) {
-	if b > 1 {
-		b = 1
-	}
-	c.Write(ESC, '-', b)
+	c.Write(ESC, '-', minByte(b, 1))
 }
 
 // BarcodeWidth 1 <= b <= 9.
 func (c *star) BarcodeWidth(b byte) {
-	if b == 0 {
-		b = 1
-	} else if b > 9 {
-		b = 9
-	}
-	c.barcodeWidth = b
+	b = maxByte(b, 1)
+	c.barcodeWidth = minByte(b, 9)
 }
 
 func (c *star) BarcodeHeight(b byte) {
-	if b == 0 {
-		b = 1
-	}
-	c.barcodeHeight = b
+	c.barcodeHeight = maxByte(b, 1)
 }
 
 func (c *star) HRIPosition(b byte) {
@@ -147,19 +134,12 @@ func (c *star) Barcode(m byte, s string) {
 //
 //	1 <= b <= 8.
 func (c *star) QRCodeSize(b byte) {
-	if b < 1 {
-		b = 1
-	} else if b > 8 {
-		b = 8
-	}
-	c.Write(ESC, GS, 'y', 'S', '2', b)
+	b = maxByte(b, 1)
+	c.Write(ESC, GS, 'y', 'S', '2', minByte(b, 8))
 }
 
 func (c *star) QRCodeCorrectionLevel(b byte) {
-	if b > 3 {
-		b = 3
-	}
-	c.Write(ESC, GS, 'y', 'S', '1', b)
+	c.Write(ESC, GS, 'y', 'S', '1', minByte(b, 3))
 }
 
 func (c *star) QRCode(s string) {
@@ -188,9 +168,7 @@ func (c *star) Image(img image.Image, invert bool) {
 	start := 0
 
 	for end := block; start < l; end += block {
-		if end > l {
-			end = l
-		}
+		end = minByte(end, l)
 
 		c.Write(ESC, 'X', xl, xh)
 		c.Write(bs[start:end]...)
@@ -201,10 +179,9 @@ func (c *star) Image(img image.Image, invert bool) {
 }
 
 func (c *star) Feed(b byte) {
-	if b == 0 {
-		return
+	if b > 0 {
+		c.Write(ESC, 'J', b)
 	}
-	c.Write(ESC, 'J', b)
 }
 
 func (c *star) LineFeed() {
@@ -218,10 +195,7 @@ func (c *star) LineFeed() {
 //	m = 2, paper is fed to cutting position, then a full cut;
 //	m = 3, paper is fed to cutting position, then a partial cut;
 func (c *star) Cut(m, _ byte) {
-	if m > 3 {
-		m = 3
-	}
-	c.Write(ESC, 'd', m)
+	c.Write(ESC, 'd', minByte(m, 3))
 }
 
 func (c *star) FullCut() {
@@ -236,15 +210,11 @@ func (c *star) OpenCashDrawer(m, t1, t2 byte) {
 	if t1 == 0 || t2 == 0 {
 		return
 	}
-	if m > 1 {
-		m = 1
-	}
-	m += 1
-	c.Write(ESC, GS, BEL, m, t1, t2)
+	c.Write(ESC, GS, BEL, minByte(m, 1)+1, t1, t2)
 }
 
 func (c *star) barcodeType(m byte) byte {
-	if m < 13 {
+	if m > 13 {
 		m = 4
 	}
 	return [14]byte{49, 48, 50, 51, 52, 55, 54, 53, 56, 57, 65, 66, 67, 68}[m]
