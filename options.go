@@ -1,5 +1,7 @@
 package thermalize
 
+import "image"
+
 const (
 	Left = iota
 	Center
@@ -52,3 +54,63 @@ const (
 	DrawerPin2 = iota
 	DrawerPin5
 )
+
+type Options interface {
+	apply(Cmd)
+}
+
+type imageFuncVersionOption byte
+
+func (ifv imageFuncVersionOption) apply(cmd Cmd) {
+	if c, ok := cmd.(*escape); ok {
+		c.version = ifv
+	}
+}
+
+func WithImageFuncVersion(v byte) Options {
+	return imageFuncVersionOption(v)
+}
+
+type pageSizeOption struct {
+	width, height float64
+}
+
+func (pso pageSizeOption) apply(cmd Cmd) {
+	if c, ok := cmd.(*postscript); ok {
+		c.width = pso.width
+		c.height = pso.height
+		c.y = pso.height
+	}
+}
+
+func WithPageSize(width, height float64) Options {
+	return pageSizeOption{width: width, height: height}
+}
+
+type barCodeFuncOption struct {
+	fn func(byte, string) image.Image
+}
+
+func (cfo barCodeFuncOption) apply(cmd Cmd) {
+	if c, ok := cmd.(*postscript); ok {
+		c.barCodeFunc = cfo.fn
+	}
+}
+
+func WithBarCodeFunc(fn func(byte, string) image.Image) Options {
+	return barCodeFuncOption{fn: fn}
+}
+
+type qrCodeFuncOption struct {
+	fn func(string) image.Image
+}
+
+func (cfo qrCodeFuncOption) apply(cmd Cmd) {
+	if c, ok := cmd.(*postscript); ok {
+		c.qrCodeFunc = cfo.fn
+	}
+}
+
+func WithQRCodeFunc(fn func(string) image.Image) Options {
+	return qrCodeFuncOption{fn: fn}
+}

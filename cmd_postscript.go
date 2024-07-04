@@ -14,42 +14,60 @@ const (
 	styleBold    = "Bold"
 )
 
-var (
-	width      float64 = 204 // 3 inch = 205 / 2 inch = 145
-	height     float64 = 400 // 1999.54mm = 5670
-	qrCodeFunc func(string) (image.Image, error)
-)
-
-func SetPostscriptPageSize(w, h float64) {
-	if w > 0 {
-		width = w
-	}
-	if h > 0 {
-		height = h
-	}
-}
-
-func SetPostscriptQRCodeFunc(f func(string) (image.Image, error)) {
-	qrCodeFunc = f
-}
-
-// NewPostscript returns the postscript set of printer commands. // 5660
-// ImageFuncVersion is not used.
-func NewPostscript(cpl, ppl int, w io.Writer, _ ImageFuncVersion) Cmd {
-	return &postscript{
+// NewPostscript returns the postscript set of printer commands configured with the specified parameters.
+//
+// This function creates a new postscript command set for printing with customizable options.
+// By default, it initializes with a width of 204 units and a height of 400 units.
+//
+// Parameters:
+//   - cpl: characters per line.
+//   - ppl: pixels per line.
+//   - w: the writer to which the commands will be sent.
+//   - opts: a variadic list of options to customize the behavior of the command set.
+//
+// Options:
+// You can customize various aspects of the postscript command set using the following options:
+//   - WithPageSize(width, height): sets the page size to the specified width and height.
+//   - WithBarCodeFunc(barCodeFunc): sets a function for generating barcodes.
+//   - WithQRCodeFunc(qrCodeFunc): sets a function for generating QR codes.
+//
+// Example Usage:
+//
+// cmd := NewPostscript(48, 576, writer, WithPageSize(204, 5670), WithBarCodeFunc(barCodeFunc), WithQRCodeFunc(qrCodeFunc))
+//
+// In this example, a new postscript command set is created with 48 characters per line,
+// 576 pixels per line. The page size is set to 204x5670 units,
+// and functions for generating barcodes and QR codes are provided.
+//
+// Default Initialization:
+// If no options are specified, the postscript command set initializes with:
+//   - Width: 204 units
+//   - Height: 400 units
+//
+// Note:
+// If functions for generating barcodes and QR codes are not provided, the call to print them will be skipped.
+func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
+	cmd := &postscript{
 		Cmd:    NewSkipper(cpl, ppl, w),
-		width:  width,
-		height: height,
-		y:      height,
+		width:  204,
+		height: 400,
+		y:      400,
 		row:    row{pieces: make([]piece, 0)},
 		font:   defaultFont,
 		sizeX:  1,
 		sizeY:  1,
 	}
+	for _, opt := range opts {
+		opt.apply(cmd)
+	}
+	return cmd
 }
 
 type postscript struct {
 	Cmd
+
+	barCodeFunc func(byte, string) image.Image
+	qrCodeFunc  func(string) image.Image
 
 	width  float64
 	height float64
@@ -130,20 +148,29 @@ func (c *postscript) Underling(b byte) {
 	c.underling = minByte(b, 2)
 }
 
+func (c *postscript) Barcode(m byte, s string) {
+	if c.barCodeFunc == nil || len(s) == 0 {
+		return
+	}
+	code := c.barCodeFunc(m, s)
+	c.Image(code, false)
+	c.LineFeed()
+}
+
 func (c *postscript) QRCode(s string) {
-	if qrCodeFunc == nil || len(s) == 0 {
+	if c.qrCodeFunc == nil || len(s) == 0 {
 		return
 	}
-	qr, err := qrCodeFunc(s)
-	if err != nil {
-		c.Text(err.Error(), nil)
-		return
-	}
-	c.Image(qr, false)
+	code := c.qrCodeFunc(s)
+	c.Image(code, false)
 	c.LineFeed()
 }
 
 func (c *postscript) Image(img image.Image, invert bool) {
+	if img == nil {
+		return
+	}
+
 	w, bs := ImageToBytes(img, invert)
 	h := img.Bounds().Size().Y
 
@@ -180,6 +207,13 @@ func (c *postscript) LineFeed() {
 func (c *postscript) Print() {
 	c.LineFeed()
 	c.showPage()
+}
+
+func (c *postscript) barcodeType(m byte) byte {
+	if m > 13 {
+		m = 4
+	}
+	return m
 }
 
 func (c *postscript) setPage() {

@@ -30,16 +30,22 @@ go get github.com/gromey/thermalize@latest
 package main
 
 import (
-	"bytes"
+	"bufio"
+	"os"
 
 	"github.com/gromey/thermalize"
-	"github.com/phin1x/go-ipp"
 )
 
 func main() {
-	w := new(bytes.Buffer)
+	f, err := os.OpenFile("/dev/ttyUSB0", os.O_RDWR, 0755)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = f.Close() }()
 
-	p := thermalize.NewEscape(48, 576, w, false)
+	w := bufio.NewWriter(f)
+
+	p := thermalize.NewEscape(48, 576, w)
 
 	p.Init()
 	p.CodePage(16)
@@ -51,20 +57,9 @@ func main() {
 	p.FullCut()
 	p.Print()
 
-	defer w.Reset()
-
-	doc := ipp.Document{
-		Document: w,
-		Size:     w.Len(),
-		Name:     "Test Page",
-		MimeType: ipp.MimeTypeOctetStream,
-	}
-
-	client := ipp.NewIPPClient("localhost", 631, "", "", true)
-	
-	if _, err := client.PrintJob(doc, "your_printer_name", nil); err != nil {
+	if err = w.Flush(); err != nil {
 		panic(err)
-    }
+	}
 }
 
 ```
@@ -90,7 +85,7 @@ func main() {
 
 	w := bufio.NewWriter(f)
 
-	p := thermalize.NewStar(48, 576, w, false)
+	p := thermalize.NewStar(48, 576, w)
 
 	p.Init()
 	p.CodePage(32)
@@ -130,7 +125,7 @@ func main() {
 	
 	w := bufio.NewWriter(f)
 
-	p := thermalize.NewEscape(48, 576, w, false)
+	p := thermalize.NewEscape(48, 576, w, thermalize.WithImageFuncVersion(1))
 
 	// To change the level of gray that should be visible when printing, change GrayLevel setting.
 	// Default is 127.
@@ -148,6 +143,68 @@ func main() {
 	p.Print()
 
 	if err = w.Flush(); err != nil {
+		panic(err)
+	}
+}
+
+```
+
+### Example 4 (Postscript)
+
+```go
+package main
+
+import (
+	"bytes"
+	"image"
+
+	"github.com/gromey/thermalize"
+	"github.com/phin1x/go-ipp"
+)
+
+func main() {
+	w := new(bytes.Buffer)
+
+	// m - Bar code mode.
+	barCode := func(m byte, s string) image.Image {
+		// get Bar code here.
+		return nil
+	}
+
+	qrCode := func(s string) image.Image {
+		// get QR code here.
+		return nil
+	}
+
+	opts := []thermalize.Options{
+		thermalize.WithPageSize(204, 5670),
+		thermalize.WithBarCodeFunc(barCode),
+		thermalize.WithQRCodeFunc(qrCode),
+	}
+
+	p := thermalize.NewPostscript(48, 576, w, opts...)
+
+	p.Init()
+	p.LineFeed()
+	p.Align(thermalize.Center)
+	p.Bold(true)
+	p.Text("Hello world!", nil)
+	p.LineFeed()
+	p.FullCut()
+	p.Print()
+
+	defer w.Reset()
+
+	doc := ipp.Document{
+		Document: w,
+		Size:     w.Len(),
+		Name:     "Test Page",
+		MimeType: ipp.MimeTypeOctetStream,
+	}
+
+	client := ipp.NewIPPClient("localhost", 631, "", "", true)
+
+	if _, err := client.PrintJob(doc, "your_printer_name", nil); err != nil {
 		panic(err)
 	}
 }

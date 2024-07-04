@@ -5,10 +5,28 @@ import (
 	"io"
 )
 
-// NewStar returns the star set of printer commands.
-// ImageFuncVersion is not used.
-func NewStar(cpl, ppl int, w io.Writer, _ ImageFuncVersion) Cmd {
-	return &star{Cmd: NewSkipper(cpl, ppl, w), hriPosition: 1, barcodeWidth: 1, barcodeHeight: 100}
+// NewStar returns the star set of printer commands for the given configuration.
+//
+// This function creates a new star sequence command set for printing images and text.
+//
+// Parameters:
+//   - cpl: characters per line.
+//   - ppl: pixels per line.
+//   - w: the writer to which the commands will be sent.
+//   - opts: a variadic list of options to customize the behavior of the command set.
+//
+// Example Usage:
+//
+// cmd := NewStar(48, 576, writer)
+//
+// In this example, a new star sequence command set is created with 48 characters per line,
+// 576 pixels per line.
+func NewStar(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
+	cmd := &star{Cmd: NewSkipper(cpl, ppl, w), hriPosition: 1, barcodeWidth: 1, barcodeHeight: 100}
+	for _, opt := range opts {
+		opt.apply(cmd)
+	}
+	return cmd
 }
 
 type star struct {
