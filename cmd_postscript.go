@@ -27,9 +27,9 @@ const (
 //
 // Options:
 // You can customize various aspects of the postscript command set using the following options:
-//   - WithPageSize(width, height): sets the page size to the specified width and height.
 //   - WithBarCodeFunc(barCodeFunc): sets a function for generating barcodes.
 //   - WithQRCodeFunc(qrCodeFunc): sets a function for generating QR codes.
+//   - WithPageSize(width, height): sets the page size to the specified width and height.
 //
 // Example Usage:
 //
@@ -154,7 +154,6 @@ func (c *postscript) Barcode(m byte, s string) {
 	}
 	code := c.barCodeFunc(m, s)
 	c.Image(code, false)
-	c.LineFeed()
 }
 
 func (c *postscript) QRCode(s string) {
@@ -163,7 +162,6 @@ func (c *postscript) QRCode(s string) {
 	}
 	code := c.qrCodeFunc(s)
 	c.Image(code, false)
-	c.LineFeed()
 }
 
 func (c *postscript) Image(img image.Image, invert bool) {
@@ -175,6 +173,7 @@ func (c *postscript) Image(img image.Image, invert bool) {
 	h := img.Bounds().Size().Y
 
 	c.image(w, h, bs)
+	c.LineFeed()
 }
 
 func (c *postscript) LineFeed() {

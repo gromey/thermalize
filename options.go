@@ -92,8 +92,13 @@ type barCodeFuncOption struct {
 }
 
 func (cfo barCodeFuncOption) apply(cmd Cmd) {
-	if c, ok := cmd.(*postscript); ok {
-		c.barCodeFunc = cfo.fn
+	switch cmd.(type) {
+	case *escape:
+		cmd.(*escape).barCodeFunc = cfo.fn
+	case *postscript:
+		cmd.(*postscript).barCodeFunc = cfo.fn
+	case *star:
+		cmd.(*star).barCodeFunc = cfo.fn
 	}
 }
 
@@ -106,8 +111,13 @@ type qrCodeFuncOption struct {
 }
 
 func (cfo qrCodeFuncOption) apply(cmd Cmd) {
-	if c, ok := cmd.(*postscript); ok {
-		c.qrCodeFunc = cfo.fn
+	switch cmd.(type) {
+	case *escape:
+		cmd.(*escape).qrCodeFunc = cfo.fn
+	case *postscript:
+		cmd.(*postscript).qrCodeFunc = cfo.fn
+	case *star:
+		cmd.(*star).qrCodeFunc = cfo.fn
 	}
 }
 
