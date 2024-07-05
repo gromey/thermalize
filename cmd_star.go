@@ -15,6 +15,11 @@ import (
 //   - w: the writer to which the commands will be sent.
 //   - opts: a variadic list of options to customize the behavior of the command set.
 //
+// Options:
+// You can customize various aspects of the postscript command set using the following options:
+//   - WithBarCodeFunc(barCodeFunc): sets a custom function for generating barcodes.
+//   - WithQRCodeFunc(qrCodeFunc): sets a custom function for generating QR codes.
+//
 // Example Usage:
 //
 // cmd := NewStar(48, 576, writer)
@@ -31,6 +36,10 @@ func NewStar(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 
 type star struct {
 	Cmd
+
+	barCodeFunc func(byte, string) image.Image
+	qrCodeFunc  func(string) image.Image
+
 	hriPosition, barcodeWidth, barcodeHeight byte
 }
 
@@ -143,6 +152,12 @@ func (c *star) Barcode(m byte, s string) {
 		return
 	}
 
+	if c.barCodeFunc != nil {
+		code := c.barCodeFunc(m, s)
+		c.Image(code, false)
+		return
+	}
+
 	c.Write(ESC, 'b', c.barcodeType(m), c.hriPosition, c.barcodeWidth, c.barcodeHeight)
 	c.Text(s, nil)
 	c.Write(RS)
@@ -163,6 +178,12 @@ func (c *star) QRCodeCorrectionLevel(b byte) {
 func (c *star) QRCode(s string) {
 	l := len(s)
 	if l == 0 {
+		return
+	}
+
+	if c.qrCodeFunc != nil {
+		code := c.qrCodeFunc(s)
+		c.Image(code, false)
 		return
 	}
 
@@ -188,6 +209,7 @@ func (c *star) Image(img image.Image, invert bool) {
 	for end := block; start < l; end += block {
 		end = minByte(end, l)
 
+		c.Write(DC2)
 		c.Write(ESC, 'X', xl, xh)
 		c.Write(bs[start:end]...)
 		c.Write(ESC, 'J', 12)

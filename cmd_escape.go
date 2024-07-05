@@ -8,7 +8,6 @@ import (
 // NewEscape returns the most popular set of printer commands for the given configuration.
 //
 // This function creates a new escape sequence command set for printing images and text.
-// By default, the obsolete [GS v ...] print image command is used.
 //
 // Parameters:
 //   - cpl: characters per line.
@@ -17,9 +16,14 @@ import (
 //   - opts: a variadic list of options to customize the behavior of the command set.
 //
 // Options:
-// You can switch the image printing function using the WithImageFuncVersion(n) option, where:
+// You can customize various aspects of the postscript command set using the following options:
+//   - WithBarCodeFunc(barCodeFunc): sets a custom function for generating barcodes.
+//   - WithQRCodeFunc(qrCodeFunc): sets a custom function for generating QR codes.
+//   - WithImageFuncVersion(n): switches the image printing function, where:
 //   - n = 1: uses the [GS 8 L ... GS ( L] print image command.
 //   - n = 2: uses the [ESC * ! ... ESC J] print image command.
+//
+// Note: By default, the obsolete [GS v ...] print image command is used.
 //
 // Example Usage:
 //
@@ -37,6 +41,10 @@ func NewEscape(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 
 type escape struct {
 	Cmd
+
+	barCodeFunc func(byte, string) image.Image
+	qrCodeFunc  func(string) image.Image
+
 	version imageFuncVersionOption
 }
 
@@ -161,6 +169,12 @@ func (c *escape) Barcode(m byte, s string) {
 		return
 	}
 
+	if c.barCodeFunc != nil {
+		code := c.barCodeFunc(m, s)
+		c.Image(code, false)
+		return
+	}
+
 	c.Write(GS, 'k', c.barcodeType(m), byte(l))
 	c.Text(s, nil)
 }
@@ -187,6 +201,12 @@ func (c *escape) QRCode(s string) {
 
 	l += 3
 	h, w := byte(l), byte(l>>8)
+
+	if c.qrCodeFunc != nil {
+		code := c.qrCodeFunc(s)
+		c.Image(code, false)
+		return
+	}
 
 	// Store the data in the symbol storage area (cn = 49, fn = 80).
 	c.Write(GS, '(', 'k', h, w, 49, 80, 48)
