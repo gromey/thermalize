@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	lineFeed = 10.8
+	charWidth = 4.25
+	lineFeed  = 10.8
 
 	styleRegular = "Regular"
 	styleBold    = "Bold"
@@ -48,14 +49,15 @@ const (
 // If functions for generating barcodes and QR codes are not provided, the call to print them will be skipped.
 func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 	cmd := &postscript{
-		Cmd:    NewSkipper(cpl, ppl, w),
-		width:  204,
-		height: 400,
-		y:      400,
-		row:    row{pieces: make([]piece, 0)},
-		font:   defaultFont,
-		sizeX:  1,
-		sizeY:  1,
+		Cmd:          NewSkipper(cpl, ppl, w),
+		tabPositions: []float64{34, 68, 102, 136, 170, 204, 238, 272, 306, 340, 374, 408, 442, 476, 510, 544, 578, 612, 646, 680, 714, 748, 782, 816, 850, 884, 918, 952, 986, 1020, 1054},
+		width:        204,
+		height:       400,
+		y:            400,
+		row:          row{pieces: make([]piece, 0)},
+		font:         defaultFont,
+		sizeX:        1,
+		sizeY:        1,
 	}
 	for _, opt := range opts {
 		opt.apply(cmd)
@@ -66,12 +68,14 @@ func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 type postscript struct {
 	Cmd
 
-	barCodeFunc func(byte, string) image.Image
-	qrCodeFunc  func(string) image.Image
+	tabPositions []float64
+	barCodeFunc  func(byte, string) image.Image
+	qrCodeFunc   func(string) image.Image
 
 	width  float64
 	height float64
 	x, y   float64
+	tab    float64
 
 	row   row
 	font  font
@@ -100,9 +104,9 @@ func (c *postscript) Text(s string, enc func(string) []byte) {
 
 	c.row.align = c.align
 
-	charSizeX := 4.25 * float64(c.sizeX)
+	charSizeX := float64(c.sizeX) * charWidth
 
-	parts := c.splitString(s, c.row.width, charSizeX)
+	parts := c.splitString(s, c.tab+c.row.width, charSizeX)
 	for i, p := range parts {
 		if i > 0 {
 			c.LineFeed()
@@ -113,14 +117,16 @@ func (c *postscript) Text(s string, enc func(string) []byte) {
 		rowPiece := piece{
 			data:      enc(p),
 			w:         float64(len([]rune(p))) * charSizeX,
+			tab:       c.tab,
 			sizeX:     c.sizeX,
 			sizeY:     c.sizeY,
 			underling: c.underling,
 			bold:      c.bold,
 		}
 
-		c.row.width += rowPiece.w
+		c.row.width += c.tab + rowPiece.w
 		c.row.pieces = append(c.row.pieces, rowPiece)
+		c.tab = 0
 	}
 }
 
@@ -133,6 +139,46 @@ func (c *postscript) Init() {
 
 func (c *postscript) Align(b byte) {
 	c.align = minByte(b, 2)
+}
+
+func (c *postscript) TabPositions(bs ...byte) {
+	l := len(bs)
+	if l == 0 {
+		return
+	} else if l > 16 {
+		bs = bs[:16]
+	}
+
+	var previous byte
+	buf := make([]float64, 0)
+	for _, n := range bs {
+		if n <= previous {
+			continue
+		}
+		if tab := float64(n) * charWidth; tab < c.width {
+			buf = append(buf, tab)
+		} else {
+			tab = c.width
+			buf = append(buf, tab)
+			break
+		}
+		previous = n
+	}
+
+	c.tabPositions = buf
+}
+
+func (c *postscript) Tab() {
+	for _, x := range c.tabPositions {
+		if c.row.width < x {
+			c.tab = x - c.row.width
+			if c.tab > c.width {
+				c.LineFeed()
+				c.tab = 0
+			}
+			break
+		}
+	}
 }
 
 func (c *postscript) CharSize(w, h byte) {
@@ -178,7 +224,6 @@ func (c *postscript) Image(img image.Image, invert bool) {
 
 func (c *postscript) LineFeed() {
 	c.y -= c.row.height
-
 	if c.y < lineFeed {
 		c.newPage()
 		c.y -= c.row.height
@@ -190,10 +235,10 @@ func (c *postscript) LineFeed() {
 		c.font.setStyle(p.bold, p.sizeX, p.sizeY)
 		c.setFont()
 
+		offset += p.tab
+
 		c.moveTo(offset, c.y)
-
 		c.Cmd.Write([]byte(fmt.Sprintf("(%s) show\n", p.data))...)
-
 		c.setLine(p.underling, offset, p.w)
 
 		offset += p.w
@@ -331,6 +376,7 @@ func (c *postscript) splitString(s string, offset, width float64) []string {
 type piece struct {
 	data      []byte
 	x, w      float64
+	tab       float64
 	sizeX     byte
 	sizeY     byte
 	underling byte
