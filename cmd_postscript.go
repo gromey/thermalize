@@ -219,7 +219,6 @@ func (c *postscript) Image(img image.Image, invert bool) {
 	h := img.Bounds().Size().Y
 
 	c.image(w, h, bs)
-	c.LineFeed()
 }
 
 func (c *postscript) LineFeed() {
