@@ -12,13 +12,6 @@
 `thermalize` can be installed like any other Go library through `go get`:
 
 ```console
-go get github.com/gromey/thermalize
-```
-
-Or, if you are already using
-[Go Modules](https://github.com/golang/go/wiki/Modules), you may specify a version number as well:
-
-```console
 go get github.com/gromey/thermalize@latest
 ```
 
