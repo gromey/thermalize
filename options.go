@@ -63,7 +63,14 @@ type imageFuncVersionOption byte
 
 func (ifv imageFuncVersionOption) apply(cmd Cmd) {
 	if c, ok := cmd.(*escape); ok {
-		c.version = ifv
+		switch ifv {
+		case 1:
+			c.imageFunc = c.imageV1
+		case 2:
+			c.imageFunc = c.imageV2
+		default:
+			c.imageFunc = c.imageObsolete
+		}
 	}
 }
 

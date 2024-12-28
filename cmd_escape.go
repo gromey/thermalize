@@ -33,6 +33,7 @@ import (
 // 576 pixels per line. The image printing function is set to use the [ESC * ! ... ESC J] command sequence (version 2).
 func NewEscape(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 	cmd := &escape{Cmd: NewSkipper(cpl, ppl, w)}
+	cmd.imageFunc = cmd.imageObsolete
 	for _, opt := range opts {
 		opt.apply(cmd)
 	}
@@ -44,8 +45,7 @@ type escape struct {
 
 	barCodeFunc func(byte, string) image.Image
 	qrCodeFunc  func(string) image.Image
-
-	version imageFuncVersionOption
+	imageFunc   func(image.Image, bool)
 }
 
 func (c *escape) Init() {
@@ -217,14 +217,7 @@ func (c *escape) QRCode(s string) {
 }
 
 func (c *escape) Image(img image.Image, invert bool) {
-	switch c.version {
-	case 1:
-		c.imageV1(img, invert)
-	case 2:
-		c.imageV2(img, invert)
-	default:
-		c.imageObsolete(img, invert)
-	}
+	c.imageFunc(img, invert)
 }
 
 func (c *escape) imageV1(img image.Image, invert bool) {
