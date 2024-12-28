@@ -46,7 +46,7 @@ const (
 //   - Height: 400 units
 //
 // Note:
-// If functions for generating barcodes and QR codes are not provided, the call to print them will be skipped.
+// If functions for generating barcodes and QR codes not provided, the call to print them will be skipped.
 func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 	cmd := &postscript{
 		Cmd:          NewSkipper(cpl, ppl, w),
@@ -87,6 +87,13 @@ type postscript struct {
 	underling byte
 
 	openDrawer bool
+}
+
+func (c *postscript) Sizing(cpl, ppl int) {
+	c.Cmd.Sizing(cpl, ppl)
+	if cpl != 0 {
+		c.width = float64(cpl) * charWidth
+	}
 }
 
 func (c *postscript) Write(bs ...byte) {

@@ -17,6 +17,15 @@ type skipper struct {
 	w   io.Writer
 }
 
+func (c *skipper) Sizing(cpl, ppl int) {
+	if cpl != 0 {
+		c.cpl = cpl
+	}
+	if ppl != 0 {
+		c.ppl = ppl
+	}
+}
+
 func (c *skipper) CPL() int {
 	return c.cpl
 }

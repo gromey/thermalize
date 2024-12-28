@@ -59,7 +59,7 @@ func (c *escape) LeftMargin(n int) {
 }
 
 func (c *escape) WidthArea(n int) {
-	if n < c.PPL() {
+	if n <= c.PPL() {
 		c.Write(GS, 'W', byte(n), byte(n>>8))
 	}
 }
