@@ -18,7 +18,6 @@ const (
 // NewPostscript returns the postscript set of printer commands configured with the specified parameters.
 //
 // This function creates a new postscript command set for printing with customizable options.
-// By default, it initializes with a width of 204 units and a height of 400 units.
 //
 // Parameters:
 //   - cpl: characters per line.
@@ -30,20 +29,18 @@ const (
 // You can customize various aspects of the postscript command set using the following options:
 //   - WithBarCodeFunc(barCodeFunc): sets a function for generating barcodes.
 //   - WithQRCodeFunc(qrCodeFunc): sets a function for generating QR codes.
-//   - WithPageSize(width, height): sets the page size to the specified width and height.
+//   - WithPageHeight(height): sets the page height to the specified value.
 //
 // Example Usage:
 //
-// cmd := NewPostscript(48, 576, writer, WithPageSize(204, 5670), WithBarCodeFunc(barCodeFunc), WithQRCodeFunc(qrCodeFunc))
+// cmd := NewPostscript(48, 576, writer, WithPageHeight(5670), WithBarCodeFunc(barCodeFunc), WithQRCodeFunc(qrCodeFunc))
 //
 // In this example, a new postscript command set is created with 48 characters per line,
-// 576 pixels per line. The page size is set to 204x5670 units,
+// 576 pixels per line. The page height is set to 5670 units,
 // and functions for generating barcodes and QR codes are provided.
 //
 // Default Initialization:
-// If no options are specified, the postscript command set initializes with:
-//   - Width: 204 units
-//   - Height: 400 units
+// If no options are specified, the postscript command set initializes with height: 400 units.
 //
 // Note:
 // If functions for generating barcodes and QR codes not provided, the call to print them will be skipped.
@@ -51,7 +48,7 @@ func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 	cmd := &postscript{
 		Cmd:          NewSkipper(cpl, ppl, w),
 		tabPositions: []float64{34, 68, 102, 136, 170, 204, 238, 272, 306, 340, 374, 408, 442, 476, 510, 544, 578, 612, 646, 680, 714, 748, 782, 816, 850, 884, 918, 952, 986, 1020, 1054},
-		width:        204,
+		width:        float64(cpl) * charWidth,
 		height:       400,
 		y:            400,
 		row:          row{pieces: make([]piece, 0)},
@@ -361,7 +358,7 @@ func (c *postscript) splitString(s string, offset, width float64) []string {
 
 	var chunks []string
 
-	if end > len(s) {
+	if end >= len(s) {
 		return append(chunks, s)
 	}
 
@@ -371,7 +368,7 @@ func (c *postscript) splitString(s string, offset, width float64) []string {
 		start = end
 		end += n
 
-		if end > len(s) {
+		if end >= len(s) {
 			return append(chunks, s[start:])
 		}
 	}

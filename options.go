@@ -78,20 +78,17 @@ func WithImageFuncVersion(v byte) Options {
 	return imageFuncVersionOption(v)
 }
 
-type pageSizeOption struct {
-	width, height float64
-}
+type pageHeight float64
 
-func (pso pageSizeOption) apply(cmd Cmd) {
+func (ph pageHeight) apply(cmd Cmd) {
 	if c, ok := cmd.(*postscript); ok {
-		c.width = pso.width
-		c.height = pso.height
-		c.y = pso.height
+		c.height = float64(ph)
+		c.y = float64(ph)
 	}
 }
 
-func WithPageSize(width, height float64) Options {
-	return pageSizeOption{width: width, height: height}
+func WithPageHeight(height float64) Options {
+	return pageHeight(height)
 }
 
 type barCodeFuncOption struct {

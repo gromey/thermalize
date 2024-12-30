@@ -170,7 +170,7 @@ func main() {
 	}
 
 	opts := []thermalize.Options{
-		thermalize.WithPageSize(204, 5670),
+		thermalize.WithPageHeight(5670),
 		thermalize.WithBarCodeFunc(barCode),
 		thermalize.WithQRCodeFunc(qrCode),
 	}
