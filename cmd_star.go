@@ -54,7 +54,7 @@ func (c *star) LeftMargin(n int) {
 }
 
 func (c *star) WidthArea(n int) {
-	if n < c.CPL() {
+	if n <= c.CPL() {
 		c.Write(ESC, 'Q', byte(n))
 	}
 }

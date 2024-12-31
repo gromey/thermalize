@@ -115,14 +115,14 @@ func main() {
 		panic(err)
 	}
 	defer func() { _ = f.Close() }()
-	
+
 	w := bufio.NewWriter(f)
 
 	p := thermalize.NewEscape(48, 576, w, thermalize.WithImageFuncVersion(1))
 
 	// To change the level of gray that should be visible when printing, change GrayLevel setting.
 	// Default is 127.
-	thermalize.GrayLevel = 150
+	thermalize.SetGrayLevel(150)
 
 	p.Init()
 	p.LineFeed()
@@ -170,7 +170,7 @@ func main() {
 	}
 
 	opts := []thermalize.Options{
-		thermalize.WithPageSize(204, 5670),
+		thermalize.WithPageHeight(5670),
 		thermalize.WithBarCodeFunc(barCode),
 		thermalize.WithQRCodeFunc(qrCode),
 	}

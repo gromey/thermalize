@@ -6,21 +6,35 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"sync/atomic"
 )
+
+func init() {
+	grayLevel.Store(uint32(defaultGrayLevel))
+}
 
 const defaultGrayLevel uint8 = 127
 
-// GrayLevel the level of gray that should be visible when printing.
-var GrayLevel = defaultGrayLevel
+var grayLevel atomic.Uint32
 
-func Gray(c color.Color, invert bool) bool {
-	if color.AlphaModel.Convert(c).(color.Alpha).A < GrayLevel {
+// SetGrayLevel sets the level of gray that should be visible when printing.
+func SetGrayLevel(l uint8) {
+	grayLevel.Store(uint32(l))
+}
+
+// ResetGrayLevel resets the level of gray that should be visible when printing to default value.
+func ResetGrayLevel() {
+	grayLevel.Store(uint32(defaultGrayLevel))
+}
+
+func gray(c color.Color, level uint8, invert bool) bool {
+	if color.AlphaModel.Convert(c).(color.Alpha).A < level {
 		return invert
 	}
 	if invert {
-		return color.GrayModel.Convert(c).(color.Gray).Y > GrayLevel
+		return color.GrayModel.Convert(c).(color.Gray).Y > level
 	}
-	return color.GrayModel.Convert(c).(color.Gray).Y < GrayLevel
+	return color.GrayModel.Convert(c).(color.Gray).Y < level
 }
 
 func ImageToBin(img image.Image, invert bool) (int, []byte) {
@@ -35,10 +49,12 @@ func ImageToBin(img image.Image, invert bool) (int, []byte) {
 	data := make([]byte, rows*sz.X)
 	shift := 3 * (sz.X - 1)
 
+	lvl := uint8(grayLevel.Load())
+
 	for y := 0; y < sz.Y; y++ {
 		n := y/8 + y/24*shift
 		for x := 0; x < sz.X; x++ {
-			if Gray(img.At(x, y), invert) {
+			if gray(img.At(x, y), lvl, invert) {
 				data[n+x*3] |= 0x80 >> uint(y%8)
 			}
 		}
@@ -57,9 +73,11 @@ func ImageToBit(img image.Image, invert bool) (int, []byte) {
 
 	data := make([]byte, w*sz.Y)
 
+	lvl := uint8(grayLevel.Load())
+
 	for y := 0; y < sz.Y; y++ {
 		for x := 0; x < sz.X; x++ {
-			if Gray(img.At(x, y), invert) {
+			if gray(img.At(x, y), lvl, invert) {
 				data[y*w+x/8] |= 0x80 >> uint(x%8)
 			}
 		}
@@ -73,9 +91,11 @@ func ImageToBytes(img image.Image, invert bool) (int, []byte) {
 
 	data := make([]byte, sz.X*sz.Y)
 
+	lvl := uint8(grayLevel.Load())
+
 	for y := 0; y < sz.Y; y++ {
 		for x := 0; x < sz.X; x++ {
-			if !Gray(img.At(x, y), invert) {
+			if !gray(img.At(x, y), lvl, invert) {
 				data[y*sz.X+x] = 255
 			}
 		}

@@ -5,10 +5,13 @@ import (
 )
 
 type Cmd interface {
-	// CPL returns the number of characters per line specified when the command set was initialized.
+	// Sizing sets the number of characters per line (CPL) and pixels per line (PPL) after the command set has been initialized.
+	Sizing(cpl, ppl int)
+
+	// CPL returns the set number of characters per line.
 	CPL() int
 
-	// PPL returns the number of pixel per line specified when the command set was initialized.
+	// PPL returns the set number of pixel per line.
 	PPL() int
 
 	// Write writes raw bytes.
