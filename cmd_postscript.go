@@ -110,7 +110,7 @@ func (c *postscript) Text(s string, enc func(string) []byte) {
 
 	charSizeX := float64(c.sizeX) * charWidth
 
-	parts := c.splitString(s, c.tab+c.row.width, charSizeX)
+	parts := c.splitString(string(enc(s)), c.tab+c.row.width, charSizeX)
 	for i, p := range parts {
 		if i > 0 {
 			c.LineFeed()
@@ -119,8 +119,8 @@ func (c *postscript) Text(s string, enc func(string) []byte) {
 		c.row.setHeight(c.sizeY)
 
 		rowPiece := piece{
-			data:      enc(p),
-			w:         float64(len([]rune(p))) * charSizeX,
+			data:      []byte(p),
+			w:         float64(len(p)) * charSizeX,
 			tab:       c.tab,
 			sizeX:     c.sizeX,
 			sizeY:     c.sizeY,
