@@ -37,8 +37,8 @@ func NewStar(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 type star struct {
 	Cmd
 
-	barCodeFunc func(byte, string) image.Image
-	qrCodeFunc  func(string) image.Image
+	barCodeFunc barCodeFunc
+	qrCodeFunc  qrCodeFunc
 
 	hriPosition, barcodeWidth, barcodeHeight byte
 }

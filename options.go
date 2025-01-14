@@ -59,11 +59,11 @@ type Options interface {
 	apply(Cmd)
 }
 
-type imageFuncVersionOption byte
+type imageFuncVersion byte
 
-func (ifv imageFuncVersionOption) apply(cmd Cmd) {
+func (v imageFuncVersion) apply(cmd Cmd) {
 	if c, ok := cmd.(*escape); ok {
-		switch ifv {
+		switch v {
 		case 1:
 			c.imageFunc = c.imageV1
 		case 2:
@@ -75,7 +75,7 @@ func (ifv imageFuncVersionOption) apply(cmd Cmd) {
 }
 
 func WithImageFuncVersion(v byte) Options {
-	return imageFuncVersionOption(v)
+	return imageFuncVersion(v)
 }
 
 type pageHeight float64
@@ -91,40 +91,36 @@ func WithPageHeight(height float64) Options {
 	return pageHeight(height)
 }
 
-type barCodeFuncOption struct {
-	fn func(byte, string) image.Image
-}
+type barCodeFunc func(byte, string) image.Image
 
-func (cfo barCodeFuncOption) apply(cmd Cmd) {
+func (fn barCodeFunc) apply(cmd Cmd) {
 	switch cmd.(type) {
 	case *escape:
-		cmd.(*escape).barCodeFunc = cfo.fn
+		cmd.(*escape).barCodeFunc = fn
 	case *postscript:
-		cmd.(*postscript).barCodeFunc = cfo.fn
+		cmd.(*postscript).barCodeFunc = fn
 	case *star:
-		cmd.(*star).barCodeFunc = cfo.fn
+		cmd.(*star).barCodeFunc = fn
 	}
 }
 
 func WithBarCodeFunc(fn func(byte, string) image.Image) Options {
-	return barCodeFuncOption{fn: fn}
+	return barCodeFunc(fn)
 }
 
-type qrCodeFuncOption struct {
-	fn func(string) image.Image
-}
+type qrCodeFunc func(string) image.Image
 
-func (cfo qrCodeFuncOption) apply(cmd Cmd) {
+func (fn qrCodeFunc) apply(cmd Cmd) {
 	switch cmd.(type) {
 	case *escape:
-		cmd.(*escape).qrCodeFunc = cfo.fn
+		cmd.(*escape).qrCodeFunc = fn
 	case *postscript:
-		cmd.(*postscript).qrCodeFunc = cfo.fn
+		cmd.(*postscript).qrCodeFunc = fn
 	case *star:
-		cmd.(*star).qrCodeFunc = cfo.fn
+		cmd.(*star).qrCodeFunc = fn
 	}
 }
 
 func WithQRCodeFunc(fn func(string) image.Image) Options {
-	return qrCodeFuncOption{fn: fn}
+	return qrCodeFunc(fn)
 }

@@ -13,6 +13,11 @@ const (
 
 	styleRegular = "Regular"
 	styleBold    = "Bold"
+
+	header = `%%!PS
+<< /PageSize [%.2f %.2f] >> setpagedevice
+/showEuro {/Euro glyphshow} def
+`
 )
 
 // NewPostscript returns the postscript set of printer commands configured with the specified parameters.
@@ -48,7 +53,7 @@ func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 	cmd := &postscript{
 		Cmd:          NewSkipper(cpl, ppl, w),
 		tabPositions: []float64{34, 68, 102, 136, 170, 204, 238, 272, 306, 340, 374, 408, 442, 476, 510, 544, 578, 612, 646, 680, 714, 748, 782, 816, 850, 884, 918, 952, 986, 1020, 1054},
-		width:        float64(cpl) * charWidth,
+		width:        float64(cpl)*charWidth + 1,
 		height:       400,
 		y:            400,
 		row:          row{pieces: make([]piece, 0)},
@@ -66,8 +71,8 @@ type postscript struct {
 	Cmd
 
 	tabPositions []float64
-	barCodeFunc  func(byte, string) image.Image
-	qrCodeFunc   func(string) image.Image
+	barCodeFunc  barCodeFunc
+	qrCodeFunc   qrCodeFunc
 
 	width  float64
 	height float64
@@ -93,10 +98,6 @@ func (c *postscript) Sizing(cpl, ppl int) {
 	}
 }
 
-func (c *postscript) Write(bs ...byte) {
-	c.Text(string(bs), nil)
-}
-
 func (c *postscript) Text(s string, enc func(string) []byte) {
 	if len(s) == 0 {
 		return
@@ -118,8 +119,11 @@ func (c *postscript) Text(s string, enc func(string) []byte) {
 
 		c.row.setHeight(c.sizeY)
 
+		d := strings.ReplaceAll(p, `\`, `\\`)
+		d = strings.ReplaceAll(d, "\x80", `) show showEuro (`)
+
 		rowPiece := piece{
-			data:      []byte(p),
+			data:      []byte(d),
 			w:         float64(len(p)) * charSizeX,
 			tab:       c.tab,
 			sizeX:     c.sizeX,
@@ -264,7 +268,7 @@ func (c *postscript) barcodeType(m byte) byte {
 }
 
 func (c *postscript) setPage() {
-	s := fmt.Sprintf("%%!PS\n<< /PageSize [%.2f %.2f] >> setpagedevice\n", c.width, c.height)
+	s := fmt.Sprintf(header, c.width, c.height)
 	c.Cmd.Write([]byte(s)...)
 }
 
