@@ -43,8 +43,8 @@ func NewEscape(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 type escape struct {
 	Cmd
 
-	barCodeFunc func(byte, string) image.Image
-	qrCodeFunc  func(string) image.Image
+	barCodeFunc barCodeFunc
+	qrCodeFunc  qrCodeFunc
 	imageFunc   func(image.Image, bool)
 }
 
