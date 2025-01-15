@@ -17,8 +17,8 @@ import (
 //
 // Options:
 // You can customize various aspects of the postscript command set using the following options:
-//   - WithBarCodeFunc(barCodeFunc): sets a custom function for generating barcodes.
-//   - WithQRCodeFunc(qrCodeFunc): sets a custom function for generating QR codes.
+//   - WithBarcodeFunc(func(string, BarcodeOptions) image.Image): sets a custom function for generating barcodes.
+//   - WithQRCodeFunc(func(string, QRCodeOptions) image.Image): sets a custom function for generating QR codes.
 //
 // Example Usage:
 //
@@ -27,20 +27,15 @@ import (
 // In this example, a new star sequence command set is created with 48 characters per line,
 // 576 pixels per line.
 func NewStar(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
-	cmd := &star{Cmd: NewSkipper(cpl, ppl, w), hriPosition: 1, barcodeWidth: 1, barcodeHeight: 100}
+	cmd := &star{skipper: newSkipper(cpl, ppl, w)}
 	for _, opt := range opts {
-		opt.apply(cmd)
+		opt.apply(cmd.skipper)
 	}
 	return cmd
 }
 
 type star struct {
-	Cmd
-
-	barCodeFunc barCodeFunc
-	qrCodeFunc  qrCodeFunc
-
-	hriPosition, barcodeWidth, barcodeHeight byte
+	*skipper
 }
 
 func (c *star) Init() {
@@ -110,12 +105,8 @@ func (c *star) CodePage(b byte) {
 	c.Write(ESC, GS, 't', b)
 }
 
-// CharSize
-//
-//	h: character height (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 5 - x5, 5 - x6)
-//	w: character width (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 4 - x5, 5 - x6)
-func (c *star) CharSize(h, w byte) {
-	c.Write(ESC, 'i', minByte(w, 5), minByte(h, 5))
+func (c *star) CharSize(w, h byte) {
+	c.Write(ESC, 'i', minByte(h, 5), minByte(w, 5))
 }
 
 func (c *star) Bold(b bool) {
@@ -130,49 +121,38 @@ func (c *star) Underling(b byte) {
 	c.Write(ESC, '-', minByte(b, 1))
 }
 
-// BarcodeWidth 1 <= b <= 9.
-func (c *star) BarcodeWidth(b byte) {
-	b = maxByte(b, 1)
-	c.barcodeWidth = minByte(b, 9)
-}
-
-func (c *star) BarcodeHeight(b byte) {
-	c.barcodeHeight = maxByte(b, 1)
-}
-
-func (c *star) HRIPosition(b byte) {
-	c.hriPosition = 1
-	if b > 1 {
-		c.hriPosition = 2
-	}
-}
-
 func (c *star) Barcode(m byte, s string) {
 	if len(s) == 0 {
 		return
 	}
 
-	if c.barCodeFunc != nil {
-		code := c.barCodeFunc(m, s)
+	if m > 13 {
+		m = 4
+	}
+
+	if c.barcodeFunc != nil {
+		code := c.barcodeFunc(s, BarcodeOptions{Mode: m, Width: c.barcodeWidth, Height: c.barcodeHeight})
 		c.Image(code, false)
 		return
 	}
 
-	c.Write(ESC, 'b', c.barcodeType(m), c.hriPosition, c.barcodeWidth, c.barcodeHeight)
+	c.Write(ESC, 'b', c.barcodeType(m), minByte(maxByte(c.hriPosition, 1), 2), c.barcodeWidth, c.barcodeHeight)
 	c.Text(s, nil)
 	c.Write(RS)
 }
 
-// QRCodeSize
-//
-//	1 <= b <= 8.
 func (c *star) QRCodeSize(b byte) {
-	b = maxByte(b, 1)
-	c.Write(ESC, GS, 'y', 'S', '2', minByte(b, 8))
+	c.skipper.QRCodeSize(b)
+	if c.qrcodeFunc == nil {
+		c.Write(ESC, GS, 'y', 'S', '2', c.qrcodeSize)
+	}
 }
 
 func (c *star) QRCodeCorrectionLevel(b byte) {
-	c.Write(ESC, GS, 'y', 'S', '1', minByte(b, 3))
+	c.skipper.QRCodeCorrectionLevel(b)
+	if c.qrcodeFunc == nil {
+		c.Write(ESC, GS, 'y', 'S', '1', c.qrcodeCorrectionLevel)
+	}
 }
 
 func (c *star) QRCode(s string) {
@@ -181,8 +161,8 @@ func (c *star) QRCode(s string) {
 		return
 	}
 
-	if c.qrCodeFunc != nil {
-		code := c.qrCodeFunc(s)
+	if c.qrcodeFunc != nil {
+		code := c.qrcodeFunc(s, QRCodeOptions{CorrectionLevel: c.qrcodeCorrectionLevel, Size: c.qrcodeSize})
 		c.Image(code, false)
 		return
 	}
@@ -228,12 +208,6 @@ func (c *star) LineFeed() {
 	c.Write(LF)
 }
 
-// Cut
-//
-//	m = 0, full cut at the current position;
-//	m = 1, partial cut at the current position;
-//	m = 2, paper is fed to cutting position, then a full cut;
-//	m = 3, paper is fed to cutting position, then a partial cut;
 func (c *star) Cut(m, _ byte) {
 	c.Write(ESC, 'd', minByte(m, 3))
 }
@@ -254,8 +228,5 @@ func (c *star) OpenCashDrawer(m, t1, t2 byte) {
 }
 
 func (c *star) barcodeType(m byte) byte {
-	if m > 13 {
-		m = 4
-	}
 	return [14]byte{49, 48, 50, 51, 52, 55, 54, 53, 56, 57, 65, 66, 67, 68}[m]
 }

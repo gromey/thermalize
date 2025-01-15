@@ -80,10 +80,10 @@ func WithImageFuncVersion(v byte) Options {
 
 type pageHeight float64
 
-func (ph pageHeight) apply(cmd Cmd) {
+func (h pageHeight) apply(cmd Cmd) {
 	if c, ok := cmd.(*postscript); ok {
-		c.height = float64(ph)
-		c.y = float64(ph)
+		c.height = float64(h)
+		c.y = float64(h)
 	}
 }
 
@@ -91,36 +91,69 @@ func WithPageHeight(height float64) Options {
 	return pageHeight(height)
 }
 
-type barCodeFunc func(byte, string) image.Image
+type BarcodeOptions struct {
+	// Mode defines the barcode type. Possible values are:
+	//   - 0: UpcA
+	//   - 1: UpcE
+	//   - 2: JanEAN8
+	//   - 3: JanEAN13
+	//   - 4: Code39
+	//   - 5: Code93
+	//   - 6: Code128
+	//   - 7: ITF
+	//   - 8: NW7
+	//   - 9: GS1128
+	//   - 10: GS1Omnidirectional
+	//   - 11: GS1Truncated
+	//   - 12: GS1Limited
+	//   - 13: GS1Expanded
+	Mode byte
 
-func (fn barCodeFunc) apply(cmd Cmd) {
-	switch cmd.(type) {
-	case *escape:
-		cmd.(*escape).barCodeFunc = fn
-	case *postscript:
-		cmd.(*postscript).barCodeFunc = fn
-	case *star:
-		cmd.(*star).barCodeFunc = fn
+	// Width specifies the barcodes line width. Possible values are:
+	//   1 to 6 (where 1 represents the thinnest lines and 6 the thickest).
+	Width byte
+
+	// Height specifies the barcodes height in arbitrary units. Possible values are:
+	//   1 to 255.
+	Height byte
+}
+
+type barcodeFunc func(string, BarcodeOptions) image.Image
+
+func (f barcodeFunc) apply(cmd Cmd) {
+	if c, ok := cmd.(*skipper); ok {
+		c.barcodeFunc = f
 	}
 }
 
-func WithBarCodeFunc(fn func(byte, string) image.Image) Options {
-	return barCodeFunc(fn)
+func WithBarcodeFunc(fn func(string, BarcodeOptions) image.Image) Options {
+	return barcodeFunc(fn)
 }
 
-type qrCodeFunc func(string) image.Image
+type QRCodeOptions struct {
+	// CorrectionLevel determines the level of error correction in the QR code.
+	// Higher levels can recover more data but reduce the amount of storable data.
+	// Possible values are:
+	//   - 0: L (Low) - Recovers up to 7% of data.
+	//   - 1: M (Medium) - Recovers up to 15% of data.
+	//   - 2: Q (Quartile) - Recovers up to 25% of data.
+	//   - 3: H (High) - Recovers up to 30% of data.
+	CorrectionLevel byte
 
-func (fn qrCodeFunc) apply(cmd Cmd) {
-	switch cmd.(type) {
-	case *escape:
-		cmd.(*escape).qrCodeFunc = fn
-	case *postscript:
-		cmd.(*postscript).qrCodeFunc = fn
-	case *star:
-		cmd.(*star).qrCodeFunc = fn
+	// Size determines the overall size of the QR code matrix. Larger sizes
+	// allow more data to be encoded but result in a bigger QR code. Possible values are:
+	//   1 to 8.
+	Size byte
+}
+
+type qrcodeFunc func(data string, opts QRCodeOptions) image.Image
+
+func (f qrcodeFunc) apply(cmd Cmd) {
+	if c, ok := cmd.(*skipper); ok {
+		c.qrcodeFunc = f
 	}
 }
 
-func WithQRCodeFunc(fn func(string) image.Image) Options {
-	return qrCodeFunc(fn)
+func WithQRCodeFunc(fn func(data string, opts QRCodeOptions) image.Image) Options {
+	return qrcodeFunc(fn)
 }

@@ -5,16 +5,25 @@ import (
 	"io"
 )
 
-// NewSkipper returns a set of methods that skip the execution of unimplemented commands.
+// newSkipper returns a set of methods that skip the execution of unimplemented commands.
 // This writes raw bytes and text to a writer.
-func NewSkipper(cpl, ppl int, w io.Writer) Cmd {
-	return &skipper{cpl: cpl, ppl: ppl, w: w}
+func newSkipper(cpl, ppl int, w io.Writer) *skipper {
+	return &skipper{cpl: cpl, ppl: ppl, w: w, barcodeWidth: 1, barcodeHeight: 100, qrcodeCorrectionLevel: Q, qrcodeSize: 5}
 }
 
 type skipper struct {
 	cpl int
 	ppl int
 	w   io.Writer
+
+	barcodeFunc   barcodeFunc
+	barcodeWidth  byte
+	barcodeHeight byte
+	hriPosition   byte
+
+	qrcodeFunc            qrcodeFunc
+	qrcodeCorrectionLevel byte
+	qrcodeSize            byte
 }
 
 func (c *skipper) Sizing(cpl, ppl int) {
@@ -77,19 +86,29 @@ func (c *skipper) ClockwiseRotation(bool) {}
 
 func (c *skipper) Underling(byte) {}
 
-func (c *skipper) BarcodeWidth(byte) {}
+func (c *skipper) BarcodeWidth(b byte) {
+	c.barcodeWidth = minByte(maxByte(b, 1), 6)
+}
 
-func (c *skipper) BarcodeHeight(byte) {}
+func (c *skipper) BarcodeHeight(b byte) {
+	c.barcodeHeight = maxByte(b, 1)
+}
 
 func (c *skipper) HRIFont(byte) {}
 
-func (c *skipper) HRIPosition(byte) {}
+func (c *skipper) HRIPosition(b byte) {
+	c.hriPosition = minByte(b, 3)
+}
 
 func (c *skipper) Barcode(byte, string) {}
 
-func (c *skipper) QRCodeSize(byte) {}
+func (c *skipper) QRCodeSize(b byte) {
+	c.qrcodeSize = minByte(maxByte(b, 1), 8)
+}
 
-func (c *skipper) QRCodeCorrectionLevel(byte) {}
+func (c *skipper) QRCodeCorrectionLevel(b byte) {
+	c.qrcodeCorrectionLevel = b
+}
 
 func (c *skipper) QRCode(string) {}
 

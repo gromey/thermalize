@@ -32,13 +32,13 @@ const (
 //
 // Options:
 // You can customize various aspects of the postscript command set using the following options:
-//   - WithBarCodeFunc(barCodeFunc): sets a function for generating barcodes.
-//   - WithQRCodeFunc(qrCodeFunc): sets a function for generating QR codes.
-//   - WithPageHeight(height): sets the page height to the specified value.
+//   - WithBarcodeFunc(func(string, BarcodeOptions) image.Image): sets a function for generating barcodes.
+//   - WithQRCodeFunc(func(string, QRCodeOptions) image.Image): sets a function for generating QR codes.
+//   - WithPageHeight(h): sets the page height to the specified value.
 //
 // Example Usage:
 //
-// cmd := NewPostscript(48, 576, writer, WithPageHeight(5670), WithBarCodeFunc(barCodeFunc), WithQRCodeFunc(qrCodeFunc))
+// cmd := NewPostscript(48, 576, writer, WithPageHeight(5670), WithBarcodeFunc(barcodeFunc), WithQRCodeFunc(qrcodeFunc))
 //
 // In this example, a new postscript command set is created with 48 characters per line,
 // 576 pixels per line. The page height is set to 5670 units,
@@ -51,7 +51,7 @@ const (
 // If functions for generating barcodes and QR codes not provided, the call to print them will be skipped.
 func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 	cmd := &postscript{
-		Cmd:          NewSkipper(cpl, ppl, w),
+		skipper:      newSkipper(cpl, ppl, w),
 		tabPositions: []float64{34, 68, 102, 136, 170, 204, 238, 272, 306, 340, 374, 408, 442, 476, 510, 544, 578, 612, 646, 680, 714, 748, 782, 816, 850, 884, 918, 952, 986, 1020, 1054},
 		width:        float64(cpl)*charWidth + 1,
 		height:       400,
@@ -63,16 +63,15 @@ func NewPostscript(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
 	}
 	for _, opt := range opts {
 		opt.apply(cmd)
+		opt.apply(cmd.skipper)
 	}
 	return cmd
 }
 
 type postscript struct {
-	Cmd
+	*skipper
 
 	tabPositions []float64
-	barCodeFunc  barCodeFunc
-	qrCodeFunc   qrCodeFunc
 
 	width  float64
 	height float64
@@ -92,7 +91,7 @@ type postscript struct {
 }
 
 func (c *postscript) Sizing(cpl, ppl int) {
-	c.Cmd.Sizing(cpl, ppl)
+	c.skipper.Sizing(cpl, ppl)
 	if cpl != 0 {
 		c.width = float64(cpl) * charWidth
 	}
@@ -203,18 +202,18 @@ func (c *postscript) Underling(b byte) {
 }
 
 func (c *postscript) Barcode(m byte, s string) {
-	if c.barCodeFunc == nil || len(s) == 0 {
+	if c.barcodeFunc == nil || len(s) == 0 {
 		return
 	}
-	code := c.barCodeFunc(m, s)
+	code := c.barcodeFunc(s, BarcodeOptions{Mode: m, Width: c.barcodeWidth, Height: c.barcodeHeight})
 	c.Image(code, false)
 }
 
 func (c *postscript) QRCode(s string) {
-	if c.qrCodeFunc == nil || len(s) == 0 {
+	if c.qrcodeFunc == nil || len(s) == 0 {
 		return
 	}
-	code := c.qrCodeFunc(s)
+	code := c.qrcodeFunc(s, QRCodeOptions{CorrectionLevel: c.qrcodeCorrectionLevel, Size: c.qrcodeSize})
 	c.Image(code, false)
 }
 
@@ -245,7 +244,7 @@ func (c *postscript) LineFeed() {
 		offset += p.tab
 
 		c.moveTo(offset, c.y)
-		c.Cmd.Write([]byte(fmt.Sprintf("(%s) show\n", p.data))...)
+		c.Write([]byte(fmt.Sprintf("(%s) show\n", p.data))...)
 		c.setLine(p.underling, offset, p.w)
 
 		offset += p.w
@@ -260,16 +259,9 @@ func (c *postscript) Print() {
 	c.showPage()
 }
 
-func (c *postscript) barcodeType(m byte) byte {
-	if m > 13 {
-		m = 4
-	}
-	return m
-}
-
 func (c *postscript) setPage() {
 	s := fmt.Sprintf(header, c.width, c.height)
-	c.Cmd.Write([]byte(s)...)
+	c.Write([]byte(s)...)
 }
 
 func (c *postscript) setFont() {
@@ -280,13 +272,13 @@ func (c *postscript) setFont() {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("/NotoSansMono-%s findfont 9 scalefont\n", c.font.style))
 	sb.WriteString(fmt.Sprintf("dup [%.2f 0 0 %d 0 0] makefont setfont\n", float64(c.font.sizeX)*0.79, c.font.sizeY))
-	c.Cmd.Write([]byte(sb.String())...)
+	c.Write([]byte(sb.String())...)
 
 	c.font.changed = false
 }
 
 func (c *postscript) moveTo(x, y float64) {
-	c.Cmd.Write([]byte(fmt.Sprintf("%.2f %.2f moveto\n", x, y))...)
+	c.Write([]byte(fmt.Sprintf("%.2f %.2f moveto\n", x, y))...)
 }
 
 func (c *postscript) setLine(underling byte, offset, width float64) {
@@ -299,7 +291,7 @@ func (c *postscript) setLine(underling byte, offset, width float64) {
 	}
 	y := c.y - 2
 
-	c.Cmd.Write([]byte(fmt.Sprintf("%.1f setlinewidth\n%.2f %.2f moveto\n%.2f %.2f lineto\nstroke\n", weight, offset, y, offset+width, y))...)
+	c.Write([]byte(fmt.Sprintf("%.1f setlinewidth\n%.2f %.2f moveto\n%.2f %.2f lineto\nstroke\n", weight, offset, y, offset+width, y))...)
 }
 
 func (c *postscript) image(width, height int, bs []byte) {
@@ -326,13 +318,13 @@ func (c *postscript) image(width, height int, bs []byte) {
 	sb.WriteString(fmt.Sprintf("[%d 0 0 %d neg 0 %d]\n{ currentfile picstr readhexstring pop }\nimage\n", width, height, height))
 	sb.WriteString(fmt.Sprintf("%X\n", bs))
 	sb.WriteString("grestore\n")
-	c.Cmd.Write([]byte(sb.String())...)
+	c.Write([]byte(sb.String())...)
 }
 
 func (c *postscript) showPage() {
 	c.y = c.height
 	c.font.changed = true
-	c.Cmd.Write([]byte("showpage\n")...)
+	c.Write([]byte("showpage\n")...)
 }
 
 func (c *postscript) newPage() {
