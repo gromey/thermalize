@@ -17,11 +17,11 @@ import (
 //
 // Options:
 // You can customize various aspects of the postscript command set using the following options:
-//   - WithBarCodeFunc(barCodeFunc): sets a custom function for generating barcodes.
-//   - WithQRCodeFunc(qrCodeFunc): sets a custom function for generating QR codes.
-//   - WithImageFuncVersion(n): switches the image printing function, where:
-//   - n = 1: uses the [GS 8 L ... GS ( L] print image command.
-//   - n = 2: uses the [ESC * ! ... ESC J] print image command.
+//   - WithBarcodeFunc(func(string, BarcodeOptions) image.Image): sets a custom function for generating barcodes.
+//   - WithQRCodeFunc(func(string, QRCodeOptions) image.Image): sets a custom function for generating QR codes.
+//   - WithImageFuncVersion(v): switches the image printing function, where:
+//   - v = 1: uses the [GS 8 L ... GS ( L] print image command.
+//   - v = 2: uses the [ESC * ! ... ESC J] print image command.
 //
 // Note: By default, the obsolete [GS v ...] print image command is used.
 //
@@ -32,20 +32,19 @@ import (
 // In this example, a new escape sequence command set is created with 48 characters per line,
 // 576 pixels per line. The image printing function is set to use the [ESC * ! ... ESC J] command sequence (version 2).
 func NewEscape(cpl, ppl int, w io.Writer, opts ...Options) Cmd {
-	cmd := &escape{Cmd: NewSkipper(cpl, ppl, w)}
+	cmd := &escape{skipper: newSkipper(cpl, ppl, w)}
 	cmd.imageFunc = cmd.imageObsolete
 	for _, opt := range opts {
 		opt.apply(cmd)
+		opt.apply(cmd.skipper)
 	}
 	return cmd
 }
 
 type escape struct {
-	Cmd
+	*skipper
 
-	barCodeFunc barCodeFunc
-	qrCodeFunc  qrCodeFunc
-	imageFunc   func(image.Image, bool)
+	imageFunc func(image.Image, bool)
 }
 
 func (c *escape) Init() {
@@ -115,12 +114,8 @@ func (c *escape) CodePage(b byte) {
 	c.Write(ESC, 't', b)
 }
 
-// CharSize
-//
-//	w: character width (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 4 - x5, 5 - x6, 6 - x7, 7 - x8)
-//	h: character height (0 - x1 `normal`, 1 - x2, 2 - x3, 3 - x4, 4 - x5, 5 - x6, 6 - x7, 7 - x8)
 func (c *escape) CharSize(w, h byte) {
-	c.Write(GS, '!', minByte(w, 7)<<4+minByte(h, 7))
+	c.Write(GS, '!', minByte(w, 5)<<4+minByte(h, 5))
 }
 
 func (c *escape) Bold(b bool) {
@@ -143,24 +138,31 @@ func (c *escape) Underling(b byte) {
 	c.Write(ESC, '-', minByte(b, 2))
 }
 
-// BarcodeWidth
-//
-//	1 <= b <= 6.
 func (c *escape) BarcodeWidth(b byte) {
-	b = maxByte(b, 1)
-	c.Write(GS, 'w', minByte(b, 6))
+	c.skipper.BarcodeWidth(b)
+	if c.barcodeFunc == nil {
+		c.Write(GS, 'w', c.barcodeWidth)
+	}
 }
 
 func (c *escape) BarcodeHeight(b byte) {
-	c.Write(GS, 'h', maxByte(b, 1))
+	c.skipper.BarcodeHeight(b)
+	if c.barcodeFunc == nil {
+		c.Write(GS, 'h', c.barcodeHeight)
+	}
 }
 
 func (c *escape) HRIFont(b byte) {
-	c.Write(GS, 'f', minByte(b, 1))
+	if c.barcodeFunc == nil {
+		c.Write(GS, 'f', minByte(b, 1))
+	}
 }
 
 func (c *escape) HRIPosition(b byte) {
-	c.Write(GS, 'H', minByte(b, 3))
+	c.skipper.HRIPosition(b)
+	if c.barcodeFunc == nil {
+		c.Write(GS, 'H', minByte(b, 3))
+	}
 }
 
 func (c *escape) Barcode(m byte, s string) {
@@ -169,8 +171,12 @@ func (c *escape) Barcode(m byte, s string) {
 		return
 	}
 
-	if c.barCodeFunc != nil {
-		code := c.barCodeFunc(m, s)
+	if m > 13 {
+		m = 4
+	}
+
+	if c.barcodeFunc != nil {
+		code := c.barcodeFunc(s, BarcodeOptions{Mode: m, Width: c.barcodeWidth, Height: c.barcodeHeight})
 		c.Image(code, false)
 		return
 	}
@@ -179,18 +185,20 @@ func (c *escape) Barcode(m byte, s string) {
 	c.Text(s, nil)
 }
 
-// QRCodeSize (cn = 49, fn = 67).
-//
-//	1 <= b <= 16.
 func (c *escape) QRCodeSize(b byte) {
-	b = maxByte(b, 1)
-	c.Write(GS, '(', 'k', 3, 0, 49, 67, minByte(b, 16))
+	c.skipper.QRCodeSize(b)
+	if c.qrcodeFunc == nil {
+		// Set the size of module (cn = 49, fn = 67).
+		c.Write(GS, '(', 'k', 3, 0, 49, 67, c.qrcodeSize)
+	}
 }
 
-// QRCodeCorrectionLevel (cn = 49, fn = 69).
 func (c *escape) QRCodeCorrectionLevel(b byte) {
-	b += 48
-	c.Write(GS, '(', 'k', 3, 0, 49, 69, b)
+	c.skipper.QRCodeCorrectionLevel(b)
+	if c.qrcodeFunc == nil {
+		// Select the error correction level (cn = 49, fn = 69).
+		c.Write(GS, '(', 'k', 3, 0, 49, 69, c.qrcodeCorrectionLevel+48)
+	}
 }
 
 func (c *escape) QRCode(s string) {
@@ -202,8 +210,8 @@ func (c *escape) QRCode(s string) {
 	l += 3
 	h, w := byte(l), byte(l>>8)
 
-	if c.qrCodeFunc != nil {
-		code := c.qrCodeFunc(s)
+	if c.qrcodeFunc != nil {
+		code := c.qrcodeFunc(s, QRCodeOptions{CorrectionLevel: c.qrcodeCorrectionLevel, Size: c.qrcodeSize})
 		c.Image(code, false)
 		return
 	}
@@ -291,16 +299,13 @@ func (c *escape) LineFeed() {
 	c.Write(LF)
 }
 
-// Cut
-//
-//	m = 0  | 1  - cuts paper;
-//	m = 65 | 66 - feeds paper to  (cutting position + [p x (vertical motion unit)]) and cuts the paper;
 func (c *escape) Cut(m, p byte) {
+	m = minByte(m, 3)
 	switch m {
 	case 0, 1:
 		c.Write(GS, 'V', m)
-	case 65, 66:
-		c.Write(GS, 'V', m, p)
+	case 2, 3:
+		c.Write(GS, 'V', m+63, p)
 	}
 }
 
@@ -324,8 +329,5 @@ func (c *escape) OpenCashDrawer(m byte, t1, t2 byte) {
 }
 
 func (c *escape) barcodeType(m byte) byte {
-	if m > 13 {
-		m = 4
-	}
 	return [14]byte{65, 66, 68, 67, 69, 72, 73, 70, 71, 74, 75, 76, 77, 78}[m]
 }

@@ -78,6 +78,8 @@ type Cmd interface {
 	Underling(b byte)
 
 	// BarcodeWidth sets the 1D barcode width multiplier.
+	//
+	//	1 <= b <= 6.
 	BarcodeWidth(b byte)
 
 	// BarcodeHeight sets the 1D barcode height, measured in dots.
@@ -119,6 +121,8 @@ type Cmd interface {
 	Barcode(m byte, s string)
 
 	// QRCodeSize sets the size of module.
+	//
+	//	1 <= b <= 8.
 	QRCodeSize(b byte)
 
 	// QRCodeCorrectionLevel sets the correction level.
@@ -144,6 +148,11 @@ type Cmd interface {
 	LineFeed()
 
 	// Cut executes the auto-cutter.
+	//
+	//	m = 0, full cut at the current position;
+	//	m = 1, partial cut at the current position;
+	//	m = 2, paper is fed to cutting position, then a full cut;
+	//	m = 3, paper is fed to cutting position, then a partial cut;
 	Cut(m byte, p byte)
 
 	// FullCut executes the auto-cutter across the full width of the paper.

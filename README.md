@@ -158,21 +158,20 @@ import (
 func main() {
 	w := new(bytes.Buffer)
 
-	// m - Bar code mode.
-	barCode := func(m byte, s string) image.Image {
+	barcodeFunc := func(d string, o thermalize.BarcodeOptions) image.Image {
 		// get Bar code here.
 		return nil
 	}
 
-	qrCode := func(s string) image.Image {
+	qrcodeFunc := func(d string, o thermalize.QRCodeOptions) image.Image {
 		// get QR code here.
 		return nil
 	}
 
 	opts := []thermalize.Options{
 		thermalize.WithPageHeight(5670),
-		thermalize.WithBarCodeFunc(barCode),
-		thermalize.WithQRCodeFunc(qrCode),
+		thermalize.WithBarcodeFunc(barcodeFunc),
+		thermalize.WithQRCodeFunc(qrcodeFunc),
 	}
 
 	p := thermalize.NewPostscript(48, 576, w, opts...)
