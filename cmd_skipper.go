@@ -24,6 +24,8 @@ type skipper struct {
 	qrcodeFunc            qrcodeFunc
 	qrcodeCorrectionLevel byte
 	qrcodeSize            byte
+
+	initFunc func(Cmd)
 }
 
 func (c *skipper) Sizing(cpl, ppl int) {

@@ -1,7 +1,9 @@
-# thermalize
+# Thermalize
 
 ![https://img.shields.io/github/v/tag/gromey/thermalize](https://img.shields.io/github/v/tag/gromey/thermalize)
 ![https://img.shields.io/github/license/gromey/thermalize](https://img.shields.io/github/license/gromey/thermalize)
+
+## Overview
 
 `thermalize` is a library that generates commands for thermal printers.
 
@@ -11,8 +13,8 @@
 
 `thermalize` can be installed like any other Go library through `go get`:
 
-```console
-go get github.com/gromey/thermalize@latest
+```sh
+  go get github.com/gromey/thermalize@latest
 ```
 
 ## Getting Started

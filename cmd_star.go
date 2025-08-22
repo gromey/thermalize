@@ -40,6 +40,9 @@ type star struct {
 
 func (c *star) Init() {
 	c.Write(ESC, '@')
+	if c.initFunc != nil {
+		c.initFunc(c)
+	}
 }
 
 func (c *star) LeftMargin(n int) {

@@ -260,6 +260,9 @@ func (c *postscript) Print() {
 }
 
 func (c *postscript) setPage() {
+	if c.initFunc != nil {
+		c.initFunc(c)
+	}
 	s := fmt.Sprintf(header, c.width, c.height)
 	c.Write([]byte(s)...)
 }
