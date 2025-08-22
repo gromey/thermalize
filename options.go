@@ -157,3 +157,15 @@ func (f qrcodeFunc) apply(cmd Cmd) {
 func WithQRCodeFunc(fn func(data string, opts QRCodeOptions) image.Image) Options {
 	return qrcodeFunc(fn)
 }
+
+type initFunc func(cmd Cmd)
+
+func (f initFunc) apply(cmd Cmd) {
+	if c, ok := cmd.(*skipper); ok {
+		c.initFunc = f
+	}
+}
+
+func WithInitFunc(fn func(cmd Cmd)) Options {
+	return initFunc(fn)
+}

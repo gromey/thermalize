@@ -49,6 +49,9 @@ type escape struct {
 
 func (c *escape) Init() {
 	c.Write(ESC, '@')
+	if c.initFunc != nil {
+		c.initFunc(c)
+	}
 }
 
 func (c *escape) LeftMargin(n int) {
@@ -264,15 +267,17 @@ func (c *escape) imageV2(img image.Image, invert bool) {
 	block := w * 3
 	start := 0
 
+	c.Write(ESC, '3', 0)
 	for end := block; start < l; end += block {
 		end = minByte(end, l)
 
 		c.Write(ESC, '*', '!', xl, xh)
 		c.Write(bs[start:end]...)
-		c.Write(ESC, 'J', 24)
+		c.Write(CR)
 
 		start = end
 	}
+	c.Write(ESC, '2')
 }
 
 func (c *escape) imageObsolete(img image.Image, invert bool) {
