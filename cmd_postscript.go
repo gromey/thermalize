@@ -86,8 +86,6 @@ type postscript struct {
 
 	align     byte
 	underling byte
-
-	openDrawer bool
 }
 
 func (c *postscript) Sizing(cpl, ppl int) {
@@ -377,7 +375,7 @@ func (c *postscript) splitString(s string, offset, width float64) []string {
 
 type piece struct {
 	data      []byte
-	x, w      float64
+	w         float64
 	tab       float64
 	sizeX     byte
 	sizeY     byte
