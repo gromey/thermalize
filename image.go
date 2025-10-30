@@ -15,11 +15,11 @@ func init() {
 
 const defaultGrayLevel uint8 = 127
 
-var grayLevel atomic.Uint32
+var grayLevel atomic.Value
 
 // SetGrayLevel sets the level of gray that should be visible when printing.
 func SetGrayLevel(l uint8) {
-	grayLevel.Store(uint32(l))
+	grayLevel.Store(l)
 }
 
 // ResetGrayLevel resets the level of gray that should be visible when printing to default value.
@@ -49,13 +49,13 @@ func ImageToBin(img image.Image, invert bool) (int, []byte) {
 	data := make([]byte, rows*sz.X)
 	shift := 3 * (sz.X - 1)
 
-	lvl := uint8(grayLevel.Load())
+	lvl := grayLevel.Load().(uint8)
 
 	for y := 0; y < sz.Y; y++ {
 		n := y/8 + y/24*shift
 		for x := 0; x < sz.X; x++ {
 			if gray(img.At(x, y), lvl, invert) {
-				data[n+x*3] |= 0x80 >> uint(y%8)
+				data[n+x*3] |= 0x80 >> (y % 8)
 			}
 		}
 	}
@@ -73,12 +73,12 @@ func ImageToBit(img image.Image, invert bool) (int, []byte) {
 
 	data := make([]byte, w*sz.Y)
 
-	lvl := uint8(grayLevel.Load())
+	lvl := grayLevel.Load().(uint8)
 
 	for y := 0; y < sz.Y; y++ {
 		for x := 0; x < sz.X; x++ {
 			if gray(img.At(x, y), lvl, invert) {
-				data[y*w+x/8] |= 0x80 >> uint(x%8)
+				data[y*w+x/8] |= 0x80 >> (x % 8)
 			}
 		}
 	}
@@ -91,7 +91,7 @@ func ImageToBytes(img image.Image, invert bool) (int, []byte) {
 
 	data := make([]byte, sz.X*sz.Y)
 
-	lvl := uint8(grayLevel.Load())
+	lvl := grayLevel.Load().(uint8)
 
 	for y := 0; y < sz.Y; y++ {
 		for x := 0; x < sz.X; x++ {
