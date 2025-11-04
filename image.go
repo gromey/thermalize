@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	grayLevel.Store(uint32(defaultGrayLevel))
+	grayLevel.Store(defaultGrayLevel)
 }
 
 const defaultGrayLevel uint8 = 127
@@ -24,7 +24,7 @@ func SetGrayLevel(l uint8) {
 
 // ResetGrayLevel resets the level of gray that should be visible when printing to default value.
 func ResetGrayLevel() {
-	grayLevel.Store(uint32(defaultGrayLevel))
+	grayLevel.Store(defaultGrayLevel)
 }
 
 func gray(c color.Color, level uint8, invert bool) bool {
